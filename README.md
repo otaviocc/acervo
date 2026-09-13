@@ -3,10 +3,6 @@
 A single static binary that organizes movie and TV libraries into
 [Jellyfin's naming convention](https://jellyfin.org/docs/general/server/media/movie-naming/)
 and backfills TV episode titles from [TVMaze](https://www.tvmaze.com/api).
-It replaces three Python scripts (`organize-movies.py`, `organize-tv.py`,
-`add-episode-titles.py`) that lived in
-[otaviocc/dotfiles](https://github.com/otaviocc/dotfiles)'s Claude Code
-skills — same parsing rules, same output, now with a test suite.
 
 ```
 Movies/
@@ -77,35 +73,3 @@ this binary's dry-run plan against a snapshot in `tests/corpus/expected/`:
 ```sh
 make corpus   # or: cargo test --test corpus
 ```
-
-Those snapshots were captured by diffing this same fixture/flag matrix against
-`organize-movies.py` / `organize-tv.py`, the Python scripts this crate
-replaced, confirming byte-identical output before they were deleted from the
-dotfiles repo. If the parsing rules ever need to be cross-checked against the
-original again, run the fixtures in `tests/corpus/` against those scripts from
-a dotfiles checkout before commit `9c5c568` (which deleted them).
-
-## Architecture
-
-- `naming.rs` — `safe_component` (path sanitizing) and `smart_title`
-  (light title-casing for shouty scene names).
-- `tokens.rs` — shared regexes: quality/junk detection, editions, language
-  codes.
-- `fsops.rs` — `execute_moves`, the single filesystem chokepoint used by all
-  three subcommands: resolves destination collisions (largest file wins),
-  refuses to overwrite, defers a move whose target is itself about to move
-  away, and falls back to copy+delete across filesystems.
-- `sim.rs` — a hand-port of `difflib.SequenceMatcher.ratio()`
-  (Ratcliff/Obershelp), since no Rust crate implements the same algorithm and
-  a different one would silently shift which TVMaze shows match.
-- `tvmaze.rs` — the TVMaze client, behind a `Client` trait so `titles`' tests
-  never touch the network.
-- `movies.rs` / `tv.rs` / `titles.rs` — one module per subcommand.
-
-## Why Rust
-
-The parsing and planning logic was already 100% algorithmic — no LLM
-judgment involved, just regexes and `difflib`. That makes it a plain
-language port, and the case for doing it is the static binary (no Python
-dependency to keep working across two machines), the speed on a large
-library, and above all a real test suite over rules that previously had none.
