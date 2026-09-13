@@ -1,8 +1,5 @@
-//! `acervo tv` — organize a TV library into
-//! `TV Shows/Show Name (year)/Season NN/Show Name (year) - sNNeNN - Title.ext`.
-//!
-//! Ported from `organize-tv.py`; see that script's module docstring
-//! (preserved in `organize-tv/SKILL.md`) for the naming convention.
+// SPDX-License-Identifier: MIT
+//! `acervo tv` — organize a TV library into `TV Shows/Show Name (year)/Season NN/...`.
 
 use crate::fsops::{execute_moves, prune_empty_dirs};
 use crate::naming::{safe_component, smart_title};
@@ -40,7 +37,7 @@ pub struct Args {
 #[derive(Clone)]
 struct Identity {
     title: String,
-    year: i32, // 0 means "no year"
+    year: i32,
     edition: Option<String>,
 }
 
@@ -50,13 +47,9 @@ enum Kind {
     Sub,
 }
 
-/// A file with no episode number yet, awaiting the specials pass: (path, filename, kind, ext).
 type SpecialItem = (PathBuf, String, Kind, String);
-/// A file already grouped by stem for the specials pass: (path, kind, ext).
 type SpecialGroup = (PathBuf, Kind, String);
-/// A parsed episode file: (path, title, season, episode, second episode, kind, ext).
 type EpisodeItem = (PathBuf, String, u32, u32, Option<u32>, Kind, String);
-/// An episode number: (season, episode, second episode for multi-episode files).
 type EpNum = (u32, u32, Option<u32>);
 
 fn media_kind(filename: &str) -> Option<(Kind, String)> {
@@ -118,11 +111,6 @@ fn parse_show_identity(name: &str) -> Option<Identity> {
     Some(Identity { title: smart_title(title), year, edition: if editions.is_empty() { None } else { Some(editions.join(" ")) } })
 }
 
-/// Derive a show title from a release name that carries no year.
-///
-/// Most scene TV releases omit the year ("Severance.S01.1080p.ATVP.WEB-DL"),
-/// so cut the release tail, any sNN/sNNeNN marker and a trailing "Season N"
-/// and keep what is left. Returns `None` if nothing usable remains.
 fn fallback_show_title(name: &str) -> Option<String> {
     let norm = DOT_UNDERSCORE_RE.replace_all(name, " ");
     let mut norm = WHITESPACE_RE.replace_all(&norm, " ").trim().to_string();
@@ -143,9 +131,6 @@ fn fallback_show_title(name: &str) -> Option<String> {
     if norm.is_empty() { None } else { Some(smart_title(norm)) }
 }
 
-/// `(season, episode, episode2, title)`. `season` is `None` when the number
-/// came from a trailing bare number, in which case the caller resolves the
-/// season from the containing folder.
 fn parse_episode(stem: &str, allow_bare: bool) -> Option<(Option<u32>, u32, Option<u32>, String)> {
     if let Some(m) = SE_RE.find(stem) {
         let caps = SE_RE.captures(stem).unwrap();
@@ -173,7 +158,6 @@ fn parse_episode(stem: &str, allow_bare: bool) -> Option<(Option<u32>, u32, Opti
     None
 }
 
-/// Try to detect a season number from the folder containing a file.
 fn season_from_folder(path: &Path) -> Option<u32> {
     let parent = path.parent()?.file_name()?.to_string_lossy().to_string();
     if let Some(caps) = SEASON_DIR_RE.captures(&parent) {
@@ -278,11 +262,6 @@ fn canonicalize(canonical: &mut HashMap<String, String>, ident: &mut Identity) {
     }
 }
 
-/// File items with no episode number as numbered Season 00 specials.
-///
-/// Videos and their subtitles are grouped by stem so a pair keeps one number,
-/// and the original name becomes the episode title so the files stay
-/// identifiable.
 fn plan_specials(ctx: &mut Ctx, warnings: &mut Vec<String>, items: &[SpecialItem], ident: &Identity, label: &str, bare: bool) {
     let mut groups: Vec<(String, Vec<SpecialGroup>)> = Vec::new();
     for (fpath, fn_, kind, ext) in items {
@@ -393,8 +372,6 @@ pub fn run(args: &Args) -> anyhow::Result<i32> {
                     continue;
                 };
                 let ident = Identity { title: title.clone(), year: 0, edition: None };
-                // Only worth saying while the folder is still being reshaped; an
-                // already-settled year-less library should not re-warn every run.
                 if entry_name != show_folder_name(&ident, true) {
                     warnings.push(format!(
                         "no year detected in '{entry_name}' — filing under '{title}'; rename to '{title} (year)' for a reliable Jellyfin match"
@@ -456,7 +433,6 @@ pub fn run(args: &Args) -> anyhow::Result<i32> {
         plan_specials(&mut ctx, &mut warnings, &unmatched, &ident, &entry_name, bare);
     }
 
-    // Loose root-level files, grouped for the specials pass by show folder name.
     let mut loose_specials: Vec<(String, Identity, Vec<SpecialItem>)> = Vec::new();
     for fn_ in &loose {
         let (kind, ext) = media_kind(fn_).unwrap();
@@ -468,9 +444,6 @@ pub fn run(args: &Args) -> anyhow::Result<i32> {
         let mut ident = match ident_opt {
             Some(i) => i,
             None => {
-                // Only fall back for files that clearly are episodes; a loose
-                // file with neither a year nor an episode marker is most
-                // likely a movie.
                 let title = if ep.is_some() { fallback_show_title(&sub) } else { None };
                 let Some(title) = title else {
                     warnings.push(format!("could not parse (file left as-is): {fn_}"));

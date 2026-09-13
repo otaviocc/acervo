@@ -1,17 +1,12 @@
+// SPDX-License-Identifier: MIT
 //! Shared regex tokens: release-junk detection, editions, language codes.
-//!
-//! Ported verbatim from the Python scripts' module-level regexes. No
-//! lookaround or backreferences are used anywhere, so every one of these
-//! translates directly onto the `regex` crate.
 
 use regex::Regex;
 use std::sync::LazyLock;
 
-/// `Title (year)` or `Title (year) {edition-...}` — an already-organized name.
 pub static ALREADY_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^(?P<title>.+?) \((?P<year>\d{4})\)(?: \{edition-(?P<ed>[^}]+)\})?$").unwrap());
 
-/// First token of the "release tail"; everything from here on is not part of the title.
 pub static QUALITY_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
         r"(?i)\b(?:\d{3,4}p|4k|2160p|1080i|bluray|blu-ray|brrip|bdrip|bdremux|remux|\
@@ -23,7 +18,6 @@ aac|ac3|dd5|ddp5|ddp|dts|truehd|atmos|flac|mp3|opus|\
     .unwrap()
 });
 
-/// Edition keywords. `None` means "noise": strip from the title but don't tag.
 pub static EDITION_PATTERNS: LazyLock<Vec<(Regex, Option<&'static str>)>> = LazyLock::new(|| {
     vec![
         (Regex::new(r"(?i)director'?s[ .]?cut").unwrap(), Some("Director's Cut")),
@@ -55,11 +49,8 @@ pub const LANG_CODES: &str = concat!(
     "tur|turkish|tr|ara|arabic|heb|hebrew|he",
 );
 
-/// A trailing language code on a subtitle stem, e.g. `...s01e01.en`.
 pub static LANG_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(&format!(r"(?i)[ ._-]({LANG_CODES})$")).unwrap());
 
-/// Same, but requiring a leading dot — used by `add-episode-titles`, which
-/// only strips a code that sits right after the extension-stripped stem.
 pub static SUB_LANG_DOT_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(&format!(r"(?i)\.(?:{LANG_CODES})$")).unwrap());
 
 pub static PART_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)\b(?:cd|dvd|disc|disk|part|pt)\s*0*([1-8])\b").unwrap());
@@ -67,17 +58,13 @@ pub static PART_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)\b(?:cd|
 pub static SPLIT_MARKER_TRAILING_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)\s*-\s*(?:cd|dvd|disc|disk|part|pt)\s*0*[1-8]\s*$").unwrap());
 
-/// Lowercased extension, including the leading dot (`os.path.splitext`
-/// equivalent for the ASCII-only extensions this crate cares about).
 pub fn ext_of(filename: &str) -> String {
     match filename.rfind('.') {
-        // A dot at position 0 (dotfile) has no extension, matching splitext.
         Some(pos) if pos > 0 => filename[pos..].to_lowercase(),
         _ => String::new(),
     }
 }
 
-/// Filename without its extension (`os.path.splitext` stem half).
 pub fn stem_of(filename: &str) -> &str {
     match filename.rfind('.') {
         Some(pos) if pos > 0 => &filename[..pos],

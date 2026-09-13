@@ -1,9 +1,5 @@
-//! `acervo titles` — backfill missing TV episode titles (and premiere years)
-//! from TVMaze into filenames already in the Jellyfin convention.
-//!
-//! Ported from `add-episode-titles.py`; see that script's module docstring
-//! (preserved in `add-episode-titles/SKILL.md`) for the two supported
-//! filename formats.
+// SPDX-License-Identifier: MIT
+//! `acervo titles` — backfill missing TV episode titles (and premiere years) from TVMaze.
 
 use crate::fsops::execute_moves;
 use crate::naming::safe_component;
@@ -73,7 +69,6 @@ fn title_sim(a: &str, b: &str) -> f64 {
     ratio(&normalize(a), &normalize(b))
 }
 
-/// `(show, show's own name if not the best match else same, best score)`.
 struct ResolveResult {
     show: Option<Show>,
     candidates: Vec<(String, String, f64)>,
@@ -179,8 +174,6 @@ pub fn run(args: &Args) -> anyhow::Result<i32> {
     run_with_client(args, &mut client)
 }
 
-/// Per-(show, year) TVMaze resolution cache: the matched show (if any) and
-/// its episode-title lookup, keyed by (season, episode).
 type ShowCache = HashMap<(String, i32), (Option<Show>, HashMap<(u32, u32), String>)>;
 
 pub fn run_with_client(args: &Args, client: &mut dyn Client) -> anyhow::Result<i32> {
@@ -193,7 +186,6 @@ pub fn run_with_client(args: &Args, client: &mut dyn Client) -> anyhow::Result<i
     println!("root={}  mode={}  threshold={}", root.display(), if args.apply { "APPLY" } else { "DRY RUN" }, args.threshold);
     println!("{}", "-".repeat(70));
 
-    // (show, year-or-0, edition-or-empty, needs_year) -> [(path, parsed)]
     type JobKey = (String, i32, String, bool);
     let mut job_order: Vec<JobKey> = Vec::new();
     let mut jobs: HashMap<JobKey, Vec<(PathBuf, ParsedFile)>> = HashMap::new();
@@ -298,8 +290,6 @@ pub fn run_with_client(args: &Args, client: &mut dyn Client) -> anyhow::Result<i
         }
 
         if needs_year && resolved_year.is_none() {
-            // The show matched but TVMaze carries no premiere date, so there
-            // is no year to insert. Skip rather than write a literal "(None)".
             no_year += items.len();
             println!("  ?? no premiere year on TVMaze — {} file(s) skipped", items.len());
             continue;
@@ -401,10 +391,7 @@ mod tests {
     #[test]
     fn resolve_show_picks_year_matching_candidate() {
         let mut client = FakeClient {
-            shows: vec![
-                show(1, "The Office", Some("2005-03-24")),
-                show(2, "The Office", Some("2001-07-09")), // UK original
-            ],
+            shows: vec![show(1, "The Office", Some("2005-03-24")), show(2, "The Office", Some("2001-07-09"))],
             episodes: HashMap::new(),
         };
         let result = resolve_show(&mut client, "The Office", 2005, 0.75);

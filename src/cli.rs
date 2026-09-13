@@ -1,10 +1,13 @@
+// SPDX-License-Identifier: MIT
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
-/// Organize movie and TV libraries into Jellyfin's naming convention, and
-/// backfill TV episode titles from TVMaze.
 #[derive(Parser)]
-#[command(name = "acervo", version, about)]
+#[command(
+    name = "acervo",
+    version,
+    about = "Organize movie and TV libraries into Jellyfin's naming convention, and backfill TV episode titles from TVMaze."
+)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Command,
@@ -12,55 +15,41 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Command {
-    /// Organize TV files into Show Name (year)/Season NN/...
+    #[command(about = "Organize TV files into Show Name (year)/Season NN/...")]
     Tv {
-        /// Library root (default: current directory)
-        #[arg(long, default_value = ".")]
+        #[arg(long, default_value = ".", help = "Library root (default: current directory)")]
         root: PathBuf,
-        /// Execute the moves (default is dry run)
-        #[arg(long)]
+        #[arg(long, help = "Execute the moves (default is dry run)")]
         apply: bool,
-        /// Drop episode titles from filenames
-        #[arg(long)]
+        #[arg(long, help = "Drop episode titles from filenames")]
         minimal: bool,
-        /// Language code for subtitle filenames (default: none)
-        #[arg(long = "sub-lang", default_value = "")]
+        #[arg(long = "sub-lang", default_value = "", help = "Language code for subtitle filenames (default: none)")]
         sub_lang: String,
-        /// Treat a trailing bare number as an episode number
-        #[arg(long = "bare-number-episodes")]
+        #[arg(long = "bare-number-episodes", help = "Treat a trailing bare number as an episode number")]
         bare_number_episodes: bool,
     },
-    /// Organize movie files into Movie Name (year)/...
+    #[command(about = "Organize movie files into Movie Name (year)/...")]
     Movies {
-        /// Library root (default: current directory)
-        #[arg(long, default_value = ".")]
+        #[arg(long, default_value = ".", help = "Library root (default: current directory)")]
         root: PathBuf,
-        /// Execute the moves (default is dry run)
-        #[arg(long)]
+        #[arg(long, help = "Execute the moves (default is dry run)")]
         apply: bool,
-        /// Do not emit {edition-...} tags
-        #[arg(long = "no-editions")]
+        #[arg(long = "no-editions", help = "Do not emit {edition-...} tags")]
         no_editions: bool,
-        /// Language code for subtitle filenames (default: keep existing)
-        #[arg(long = "sub-lang", default_value = "")]
+        #[arg(long = "sub-lang", default_value = "", help = "Language code for subtitle filenames (default: keep existing)")]
         sub_lang: String,
     },
-    /// Backfill episode titles (and premiere years) from TVMaze
+    #[command(about = "Backfill episode titles (and premiere years) from TVMaze")]
     Titles {
-        /// TV library root (default: current directory)
-        #[arg(long, default_value = ".")]
+        #[arg(long, default_value = ".", help = "TV library root (default: current directory)")]
         root: PathBuf,
-        /// Execute the renames (default is dry run)
-        #[arg(long)]
+        #[arg(long, help = "Execute the renames (default is dry run)")]
         apply: bool,
-        /// Use the first episode's title for multi-episode files
-        #[arg(long = "multi-ep-first")]
+        #[arg(long = "multi-ep-first", help = "Use the first episode's title for multi-episode files")]
         multi_ep_first: bool,
-        /// Minimum TVMaze title similarity to accept (default 0.75)
-        #[arg(long, default_value_t = 0.75)]
+        #[arg(long, default_value_t = 0.75, help = "Minimum TVMaze title similarity to accept (default 0.75)")]
         threshold: f64,
-        /// HTTP timeout in seconds (default 15)
-        #[arg(long, default_value_t = 15)]
+        #[arg(long, default_value_t = 15, help = "HTTP timeout in seconds (default 15)")]
         timeout: u64,
     },
 }

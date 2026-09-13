@@ -1,9 +1,5 @@
-//! The single filesystem chokepoint: validates and performs a planned batch
-//! of moves, plus the empty-directory sweep that follows an `--apply`.
-//!
-//! Ported from the `execute_moves`/`prune_empty_dirs` pair that was
-//! byte-identical across `organize-tv.py`, `organize-movies.py` and (as a
-//! superset, with `dir_renames`) `add-episode-titles.py`.
+// SPDX-License-Identifier: MIT
+//! The single filesystem chokepoint for all three subcommands.
 
 use std::collections::HashMap;
 use std::fs;
@@ -25,8 +21,6 @@ fn file_size(path: &Path) -> u64 {
     fs::metadata(path).map(|m| m.len()).unwrap_or(0)
 }
 
-/// True when `a` and `b` refer to the same inode on the same device — the
-/// case-insensitive-filesystem-safe equivalent of Python's `os.path.samefile`.
 fn same_file(a: &Path, b: &Path) -> bool {
     match (fs::metadata(a), fs::metadata(b)) {
         (Ok(ma), Ok(mb)) => ma.dev() == mb.dev() && ma.ino() == mb.ino(),
@@ -34,8 +28,6 @@ fn same_file(a: &Path, b: &Path) -> bool {
     }
 }
 
-/// `fs::rename`, falling back to copy-then-remove on `EXDEV` (crossing
-/// filesystems), matching `shutil.move`'s behaviour.
 fn move_file(src: &Path, dst: &Path) -> io::Result<()> {
     match fs::rename(src, dst) {
         Ok(()) => Ok(()),
@@ -61,19 +53,10 @@ fn libc_exdev() -> i32 {
     18
 }
 
-/// Print, validate and optionally perform a batch of `(src, dst)` moves.
-///
-/// Resolves destinations claimed by several sources in favour of the largest
-/// file, refuses to overwrite anything already on disk unless the occupant is
-/// itself scheduled to move away (deferred until its own move clears the
-/// path), and prints every problem during the dry run before anything moves.
-/// `dir_renames` (used only by `titles`) is applied via `fs::rename` after
-/// every file move completes.
 pub fn execute_moves(moves: &[(PathBuf, PathBuf)], root: &Path, apply: bool, dir_renames: &[(PathBuf, PathBuf)]) -> MoveResult {
     let mut problems: Vec<String> = Vec::new();
     let mut skipped = 0usize;
 
-    // Group by destination, preserving first-seen order.
     let mut order: Vec<PathBuf> = Vec::new();
     let mut by_dst: HashMap<PathBuf, Vec<(PathBuf, PathBuf)>> = HashMap::new();
     for (src, dst) in moves {
@@ -93,8 +76,6 @@ pub fn execute_moves(moves: &[(PathBuf, PathBuf)], root: &Path, apply: bool, dir
     for key in &order {
         let mut items = by_dst.remove(key).unwrap();
         if items.len() > 1 {
-            // Best candidate first: largest file, then longest name, then path
-            // (stable tiebreak so output is deterministic).
             items.sort_by(|a, b| {
                 let sa = file_size(&a.0);
                 let sb = file_size(&b.0);
@@ -205,8 +186,6 @@ fn absolute(path: &Path) -> PathBuf {
     if path.is_absolute() { path.to_path_buf() } else { std::env::current_dir().unwrap_or_default().join(path) }
 }
 
-/// Remove any directory under `candidates` (and their descendants) left empty
-/// by a completed `--apply`, deepest first. Never removes `root` itself.
 pub fn prune_empty_dirs(root: &Path, candidates: &[PathBuf]) -> usize {
     let root_abs = absolute(root);
     let mut removed = 0usize;
@@ -220,8 +199,6 @@ pub fn prune_empty_dirs(root: &Path, candidates: &[PathBuf]) -> usize {
             .filter(|e| e.file_type().is_dir())
             .map(|e| e.path().to_path_buf())
             .collect();
-        // Deepest first, so a nested empty dir is removed before its parent
-        // is checked in the same pass (matches os.walk(topdown=False)).
         dirs.sort_by_key(|d| std::cmp::Reverse(d.components().count()));
         for dirpath in dirs {
             if absolute(&dirpath) == root_abs {
@@ -287,7 +264,6 @@ mod tests {
         let b = root.join("b.mkv");
         touch(&a, b"a");
         touch(&b, b"b");
-        // a -> b, b -> c: b's move must run before a's, in either order given.
         let c = root.join("c.mkv");
         let moves = vec![(a.clone(), b.clone()), (b.clone(), c.clone())];
         let result = execute_moves(&moves, root, true, &[]);
@@ -305,8 +281,6 @@ mod tests {
         fs::create_dir_all(&src).unwrap();
         let dst = root.join("Show (2019)");
         let result = execute_moves(&[(src.clone(), dst.clone())], root, true, &[]);
-        // On a case-sensitive filesystem this is just a normal rename; assert
-        // only that it isn't reported as a conflict either way.
         assert_eq!(result.skipped, 0);
         assert_eq!(result.done, 1);
     }

@@ -13,11 +13,18 @@ Architecture section for the module layout.
 ```sh
 make build                              # cargo build --release
 make test                               # cargo test
-make lint                               # cargo clippy --all-targets -- -D warnings (not verified here — no rustup)
-cargo fmt --all -- --check              # not verified here — no rustup
+make lint                               # cargo clippy --all-targets -- -D warnings
+cargo fmt --all -- --check
 make install                            # cargo install --path . --locked --force
 make corpus                             # golden-corpus regression test (tests/corpus.rs) on its own
 ```
+
+`rustfmt`/`clippy` on this machine live at `/usr/bin/rustfmt` and
+`/usr/bin/cargo-fmt` (Fedora's `rustfmt`/`clippy` packages); an unrelated,
+much older `rustfmt`/`cargo-fmt` pair sitting in `~/.cargo/bin` shadows them
+in `PATH`, so run `PATH="/usr/bin:$PATH" cargo fmt ...` rather than plain
+`cargo fmt` if formatting looks like it did nothing or errors on unrecognized
+flags.
 
 ## Architecture
 
@@ -36,6 +43,22 @@ make corpus                             # golden-corpus regression test (tests/c
   a fake implementation, never the network.
 - `movies.rs`, `tv.rs`, `titles.rs` — one module per subcommand, each holding
   its own `Args`, parsing functions, and `run()`.
+
+## Code conventions
+
+- **No comments in Rust.** A file may carry a single `//!` line saying what it
+  is, for navigation. Nothing else: no `///`, no `//`. A comment is a claim
+  nobody checks, and it lends authority to whatever it sits above. Put the
+  explanation in the commit message and PR body, or in this file's
+  Architecture section above, which are dated/searchable and tied to a diff.
+  If code needs a paragraph to be understood, prefer a name, a smaller
+  function, or a test. The one structural exception is `clap`'s derive
+  macros in `cli.rs`: use `#[arg(help = "...")]` / `#[command(about = "...")]`
+  rather than a `///` doc comment above a field or variant, since clap reads
+  doc comments as `--help` text and a stray `///` there is functional, not
+  narrative.
+- Every `src/*.rs` and `tests/*.rs` file starts with `// SPDX-License-Identifier: MIT`
+  as its first line, above the `//!` module line.
 
 ## Verifying a change to parsing rules
 

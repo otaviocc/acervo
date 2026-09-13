@@ -1,26 +1,16 @@
-//! Path-component sanitizing and light title-casing.
-//!
-//! Shared by all three subcommands (`safe_component`, `smart_title` and
-//! `SMALL_WORDS` were duplicated four ways across the Python scripts this
-//! crate replaces).
+// SPDX-License-Identifier: MIT
+//! Path-component sanitizing and light title-casing, shared by all three subcommands.
 
 use regex::Regex;
 use std::sync::LazyLock;
 
-/// Characters rewritten to a dash: illegal as a path separator on every
-/// filesystem a media library is typically served from (APFS, ext4, SMB/NTFS).
 static UNSAFE_DASH_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[/\\|]").unwrap());
-/// Characters dropped outright: reserved or control characters.
 static UNSAFE_DROP_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"[:?"*<>\x00-\x1f]"#).unwrap());
 static WHITESPACE_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\s+").unwrap());
 
 pub static SMALL_WORDS: &[&str] =
     &["a", "an", "the", "of", "and", "or", "in", "on", "to", "for", "vs", "at", "by", "with", "from", "as", "but", "nor"];
 
-/// Make a string safe to use as a single path component.
-///
-/// Titles are derived from untrusted source filenames, so separators and
-/// reserved characters are rewritten rather than passed through into a path.
 pub fn safe_component(name: &str) -> String {
     let name = UNSAFE_DASH_RE.replace_all(name, "-");
     let name = UNSAFE_DROP_RE.replace_all(&name, "");
@@ -29,10 +19,6 @@ pub fn safe_component(name: &str) -> String {
     if trimmed.is_empty() { "_".to_string() } else { trimmed.to_string() }
 }
 
-/// A fully shouty release name ("THE.DARK.KNIGHT") has no way to distinguish
-/// real acronyms from all-caps noise, so title-case every word in that case.
-/// Otherwise, a word that already carries mixed case is left alone (acronyms,
-/// already-proper-cased names, etc.).
 pub fn smart_title(text: &str) -> String {
     let all_caps = is_upper(text);
     let words: Vec<&str> = text.split_whitespace().collect();
@@ -53,8 +39,6 @@ pub fn smart_title(text: &str) -> String {
     out.join(" ")
 }
 
-/// Mirrors Python's `str.isupper()`: true only if the string has at least one
-/// cased character, and none of them are lowercase.
 fn is_upper(text: &str) -> bool {
     let mut has_cased = false;
     for c in text.chars() {

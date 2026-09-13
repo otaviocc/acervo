@@ -1,8 +1,5 @@
-//! `acervo movies` — organize a movie library into
-//! `Movies/Movie Name (year)/Movie Name (year).ext`.
-//!
-//! Ported from `organize-movies.py`; see that script's module docstring
-//! (preserved in `organize-movies/SKILL.md`) for the naming convention.
+// SPDX-License-Identifier: MIT
+//! `acervo movies` — organize a movie library into `Movies/Movie Name (year)/Movie Name (year).ext`.
 
 use crate::fsops::{execute_moves, prune_empty_dirs};
 use crate::naming::{safe_component, smart_title};
@@ -50,7 +47,6 @@ fn media_kind(filename: &str) -> Option<(Kind, String)> {
 }
 
 fn parse_identity(stem: &str) -> Option<Parsed> {
-    // Drop a trailing organized split marker ("Title (2010) - pt1") before matching.
     let stem = crate::tokens::SPLIT_MARKER_TRAILING_RE.replace(stem, "");
 
     if let Some(caps) = crate::tokens::ALREADY_RE.captures(&stem) {
@@ -87,7 +83,6 @@ fn parse_identity(stem: &str) -> Option<Parsed> {
 
     let mut title = head[..ym.start()].trim().to_string();
     if title.is_empty() {
-        // leading-year style: "2024 War Machine"
         title = head[ym.end()..].trim().to_string();
     }
 
@@ -101,11 +96,6 @@ fn parse_identity(stem: &str) -> Option<Parsed> {
     Some(Parsed { title: smart_title(title), year, edition: if editions.is_empty() { None } else { Some(editions.join(" ")) } })
 }
 
-/// Detect a multi-disc/multi-part split marker (e.g. "CD1", "Part 2").
-///
-/// Skips titles where the parsed movie title already spells out that same
-/// part number (e.g. "Mockingjay Part 1"), so it isn't tagged a second time
-/// as "... - pt1".
 fn detect_part(stem: &str, title: &str) -> Option<u32> {
     let normalized = DOT_UNDERSCORE_RE.replace_all(stem, " ");
     let caps = PART_RE.captures(&normalized)?;
@@ -189,8 +179,6 @@ pub fn run(args: &Args) -> anyhow::Result<i32> {
 
     for full in &entries {
         if full.is_dir() {
-            // Release folders often nest subtitles in a "Subs/" directory, so
-            // walk the whole tree rather than just the top level.
             let mut found: Vec<PathBuf> = Vec::new();
             for entry in walkdir::WalkDir::new(full).into_iter().filter_map(|e| e.ok()) {
                 if entry.file_type().is_file() {
@@ -239,8 +227,6 @@ pub fn run(args: &Args) -> anyhow::Result<i32> {
         }
     }
 
-    // Group loose root-level files by movie identity. A case-insensitive key
-    // avoids duplicate folders from casing differences.
     let mut canonical: HashMap<String, String> = HashMap::new();
     for full in &loose {
         let fn_ = full.file_name().unwrap().to_string_lossy().to_string();

@@ -1,15 +1,5 @@
-//! Golden-corpus regression test.
-//!
-//! Builds the synthetic libraries under `tests/corpus/` and diffs `acervo`'s
-//! dry-run plan against a checked-in snapshot in `tests/corpus/expected/`.
-//!
-//! These snapshots were captured by running this same fixture/flag matrix
-//! against `organize-movies.py` / `organize-tv.py` (the Python scripts this
-//! crate replaced) and confirming byte-identical output before those scripts
-//! were deleted from the dotfiles repo — see the crate README's
-//! "Differential check against the Python originals" section for how to
-//! re-verify that against a pre-removal checkout if the parsing rules ever
-//! need to be cross-checked against the original again.
+// SPDX-License-Identifier: MIT
+//! Golden-corpus regression test against the snapshots in `tests/corpus/expected/`.
 
 use std::path::Path;
 use std::process::Command;
@@ -32,9 +22,6 @@ fn build_fixture(script: &str, dir: &Path) {
     assert!(status.success(), "{script} failed");
 }
 
-/// Runs `acervo <sub> --root <fixture> <flags...>`, strips the `root=` banner
-/// line (which necessarily differs between the fixture's tempdir and the
-/// tempdir the snapshot was originally captured from), and returns stdout.
 fn run(sub: &str, root: &Path, flags: &[&str]) -> String {
     let output = Command::new(bin()).arg(sub).arg("--root").arg(root).args(flags).output().expect("failed to run acervo");
     assert!(output.status.success(), "acervo {sub} exited non-zero");

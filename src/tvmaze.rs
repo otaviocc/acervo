@@ -1,8 +1,5 @@
+// SPDX-License-Identifier: MIT
 //! Minimal blocking client for the keyless TVMaze API, used by `titles`.
-//!
-//! Deliberately serialized (`REQUEST_GAP` between requests) rather than
-//! async: the Python this replaces made the same choice, and there is only
-//! ever one request in flight.
 
 use serde::Deserialize;
 use std::thread;
@@ -32,8 +29,6 @@ struct Episode {
     name: Option<String>,
 }
 
-/// Anything that can answer the two TVMaze calls `titles` needs. Lets tests
-/// substitute recorded responses instead of hitting the network.
 pub trait Client {
     fn search_shows(&mut self, title: &str) -> Vec<Show>;
     fn episodes(&mut self, show_id: u64) -> Vec<(u32, u32, String)>;

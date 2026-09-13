@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 mod cli;
 mod fsops;
 mod movies;

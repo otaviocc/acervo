@@ -1,12 +1,5 @@
-//! A faithful port of `difflib.SequenceMatcher(None, a, b).ratio()`
-//! (Ratcliff/Obershelp), used by `titles` to score TVMaze show candidates.
-//!
-//! `strsim` and friends implement different algorithms (Levenshtein, Jaro-
-//! Winkler, ...) that would silently shift which shows clear `--threshold`,
-//! so this is hand-ported rather than swapped for a crate. Python's
-//! `autojunk` heuristic is omitted: it only engages for a sequence of 200+
-//! characters, and every string here is a normalized show title — far short
-//! of that, so the omission changes nothing for real input.
+// SPDX-License-Identifier: MIT
+//! A hand-port of `difflib.SequenceMatcher(None, a, b).ratio()` (Ratcliff/Obershelp).
 
 use std::collections::HashMap;
 
@@ -24,8 +17,6 @@ fn find_longest_match(
     let mut bestsize = 0usize;
     let mut j2len: HashMap<usize, usize> = HashMap::new();
 
-    // `i` mirrors Python's `for i in range(alo, ahi)` and feeds into `besti`
-    // below, so an iterator/enumerate rewrite would obscure the 1:1 port.
     #[allow(clippy::needless_range_loop)]
     for i in alo..ahi {
         let mut newj2len: HashMap<usize, usize> = HashMap::new();
@@ -75,8 +66,6 @@ fn matching_blocks(a: &[char], b: &[char]) -> Vec<(usize, usize, usize)> {
     blocks
 }
 
-/// Similarity ratio in `[0.0, 1.0]`, `2*M / T` where `M` is the total length
-/// of matching blocks and `T` is the combined length of both strings.
 pub fn ratio(a: &str, b: &str) -> f64 {
     let av: Vec<char> = a.chars().collect();
     let bv: Vec<char> = b.chars().collect();
@@ -92,7 +81,6 @@ pub fn ratio(a: &str, b: &str) -> f64 {
 mod tests {
     use super::*;
 
-    // Expected values cross-checked against CPython's difflib.SequenceMatcher.
     #[test]
     fn identical_strings() {
         assert_eq!(ratio("severance", "severance"), 1.0);
@@ -110,14 +98,12 @@ mod tests {
 
     #[test]
     fn known_pair() {
-        // difflib.SequenceMatcher(None, "the office", "the office us").ratio()
         let r = ratio("the office", "the office us");
         assert!((r - 0.8695652173913043).abs() < 1e-9, "got {r}");
     }
 
     #[test]
     fn unrelated_strings() {
-        // difflib.SequenceMatcher(None, "breaking bad", "the sopranos").ratio()
         let r = ratio("breaking bad", "the sopranos");
         assert!((r - 0.25).abs() < 1e-9, "got {r}");
     }
