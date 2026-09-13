@@ -1,0 +1,20 @@
+----------------------------------------------------------------------
+Blade.Runner.2049.2017.1080p.BluRay.x264-GROUP/Blade.Runner.2049.2017.1080p.BluRay.x264-GROUP.mkv
+   -> Blade Runner 2049 (2017)/Blade Runner 2049 (2017).mkv
+John.Wick.2014.1080p.BluRay.x264-GROUP/John.Wick.2014.1080p.BluRay.x264-GROUP.mkv
+   -> John Wick (2014)/John Wick (2014).mkv
+John.Wick.2014.1080p.BluRay.x264-GROUP/Subs/2_English.srt
+   -> John Wick (2014)/John Wick (2014).english.srt
+Mockingjay.Part.1.2014.1080p.BluRay.x264-GROUP/Mockingjay.Part.1.2014.1080p.BluRay.x264-GROUP.mkv
+   -> Mockingjay Part 1 (2014)/Mockingjay Part 1 (2014).mkv
+The.Batman.2022.Directors.Cut.2160p.WEB-DL.x265-GROUP/The.Batman.2022.Directors.Cut.2160p.WEB-DL.x265-GROUP.mkv
+   -> The Batman (2022)/The Batman (2022).mkv
+2024 War Machine 1080p WEB-DL x264-GROUP.mkv
+   -> War Machine (2024)/War Machine (2024).mkv
+The.Old.Movie.1999.CD1.DVDRip.XviD-GROUP.avi
+   -> The Old Movie (1999)/The Old Movie (1999) - pt1.avi
+The.Old.Movie.1999.CD2.DVDRip.XviD-GROUP.avi
+   -> The Old Movie (1999)/The Old Movie (1999) - pt2.avi
+----------------------------------------------------------------------
+  ?? could not parse (file left as-is): NoYearHere.1080p.BluRay.x264-GROUP.mkv
+planned: 8   skipped: 0   warnings: 1   (DRY RUN — re-run with --apply to execute)

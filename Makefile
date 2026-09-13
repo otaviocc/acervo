@@ -1,4 +1,4 @@
-.PHONY: build run test clean fmt lint install uninstall corpus
+.PHONY: build test clean fmt lint install uninstall corpus
 
 build:
 	cargo build --release
@@ -21,8 +21,9 @@ install:
 uninstall:
 	cargo uninstall acervo
 
-# Differential check against the Python scripts this crate replaces. Needs
-# python3 and a checkout of otaviocc/dotfiles's claude/.claude/skills/.
-# Usage: make corpus SKILLS=/path/to/dotfiles/claude/.claude/skills
+# The golden-corpus regression test alone (tests/corpus.rs) — the synthetic
+# libraries in tests/corpus/ diffed against the checked-in snapshots in
+# tests/corpus/expected/. Already covered by `make test`; this is just a
+# faster way to re-run it on its own.
 corpus:
-	tests/corpus/diff_check.sh $(SKILLS)
+	cargo test --test corpus

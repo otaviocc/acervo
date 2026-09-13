@@ -1,0 +1,25 @@
+----------------------------------------------------------------------
+Chernobyl.S01E01E02.1080p.WEB-DL.x264-GROUP/chernobyl.s01e01e02.mkv
+   -> Chernobyl S01E01E02/Season 01/Chernobyl S01E01E02 - s01e01-e02.mkv
+Good Show (2015)/Season 01/Good.Show.S01E01.The.Pilot.720p.HDTV.x264-GROUP.mkv
+   -> Good Show (2015)/Season 01/Good Show (2015) - s01e01 - The Pilot Episode.mkv
+Kids Cartoon/Season 01/Kids Cartoon 3.mkv
+   -> Kids Cartoon/Season 00/Kids Cartoon - s00e01 - Kids Cartoon 3.mkv
+Paired Show (2020)/Season 01/Paired Show (2020) - s01e01 - Debut.it.srt
+   -> Paired Show (2020)/Season 01/Paired Show (2020) - s01e01 - Debut.en.srt
+Severance.S01.1080p.ATVP.WEB-DL/Severance.S01E01.1080p.ATVP.WEB-DL.x264-GROUP.en.srt
+   -> Severance/Season 01/Severance - s01e01.en.srt
+Severance.S01.1080p.ATVP.WEB-DL/Severance.S01E01.1080p.ATVP.WEB-DL.x264-GROUP.mkv
+   -> Severance/Season 01/Severance - s01e01.mkv
+Loose Show (2018) - s01e01 - Loose Episode.mkv
+   -> Loose Show (2018)/Season 01/Loose Show (2018) - s01e01 - Loose Episode.mkv
+Odd.Show.S02E05.(1).and.(2).720p.HDTV.x264.mkv
+   -> Odd Show/Season 02/Odd Show - s02e05-e06.mkv
+  !! duplicate target: keeping Good Show (2015)/Season 01/Good.Show.S01E01.The.Pilot.720p.HDTV.x264-GROUP.mkv, skipping Good Show (2015)/Season 01/Good.Show.S01E01.The.Pilot.Episode.720p.WEB-DL.x264-GROUP.mkv (both map to Good Show (2015)/Season 01/Good Show (2015) - s01e01 - The Pilot Episode.mkv)
+----------------------------------------------------------------------
+  ?? no year detected in 'Chernobyl.S01E01E02.1080p.WEB-DL.x264-GROUP' — filing under 'Chernobyl S01E01E02'; rename to 'Chernobyl S01E01E02 (year)' for a reliable Jellyfin match
+  ?? 1 item(s) in 'Kids Cartoon' had no episode number — filed as Season 00 specials  [if they are episodes named 'Name 1..N', add --bare-number-episodes]
+  ?? no year detected in 'Severance.S01.1080p.ATVP.WEB-DL' — filing under 'Severance'; rename to 'Severance (year)' for a reliable Jellyfin match
+  ?? could not parse (file left as-is): ###unparseable###.mkv
+  ?? no year detected for 'Odd Show' — filing under 'Odd Show'; add the year for a reliable Jellyfin match
+planned: 8   skipped: 1   warnings: 5   (DRY RUN — re-run with --apply to execute)

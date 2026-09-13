@@ -16,7 +16,7 @@ make test                               # cargo test
 make lint                               # cargo clippy --all-targets -- -D warnings (not verified here — no rustup)
 cargo fmt --all -- --check              # not verified here — no rustup
 make install                            # cargo install --path . --locked --force
-make corpus SKILLS=/path/to/dotfiles/claude/.claude/skills   # differential check vs the Python originals
+make corpus                             # golden-corpus regression test (tests/corpus.rs) on its own
 ```
 
 ## Architecture
@@ -40,6 +40,10 @@ make corpus SKILLS=/path/to/dotfiles/claude/.claude/skills   # differential chec
 ## Verifying a change to parsing rules
 
 Any change to `naming.rs`, `tokens.rs`, `movies.rs`, or `tv.rs` should be
-checked against `tests/corpus/diff_check.sh`, which runs both this binary and
-the original Python scripts (from a dotfiles checkout) over an identical
-synthetic library and diffs their dry-run plans. See `make corpus` above.
+checked against `tests/corpus.rs`, which builds the synthetic libraries in
+`tests/corpus/` and diffs this binary's dry-run plan against the checked-in
+snapshots in `tests/corpus/expected/`. If a change is intentional, regenerate
+the snapshot for the subcommand/flags it affects rather than hand-editing it —
+see `README.md`'s "Golden-corpus regression test" section for how those
+snapshots were originally captured (against the Python scripts this crate
+replaced, before they were deleted from the dotfiles repo).

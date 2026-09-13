@@ -67,20 +67,23 @@ cargo test --lib movies::   # one module's tests
 
 `fmt`, `lint` and `test` should all pass before a PR.
 
-### Differential check against the Python originals
+### Golden-corpus regression test
 
 `tests/corpus/` builds a synthetic library covering every parsing branch
 (multi-episode files, editions, year-less releases, multi-disc movies, quality
-copies colliding on one destination, unparseable leftovers, ...) and diffs
-this binary's dry-run plan against the Python scripts it replaces, run over
-the identical tree. Requires `python3` and a checkout of the dotfiles repo:
+copies colliding on one destination, unparseable leftovers, ...) and checks
+this binary's dry-run plan against a snapshot in `tests/corpus/expected/`:
 
 ```sh
-make corpus SKILLS=/path/to/dotfiles/claude/.claude/skills
+make corpus   # or: cargo test --test corpus
 ```
 
-This is how the port was verified faithful before the Python scripts were
-retired — worth re-running after any change to the parsing rules.
+Those snapshots were captured by diffing this same fixture/flag matrix against
+`organize-movies.py` / `organize-tv.py`, the Python scripts this crate
+replaced, confirming byte-identical output before they were deleted from the
+dotfiles repo. If the parsing rules ever need to be cross-checked against the
+original again, run the fixtures in `tests/corpus/` against those scripts from
+a dotfiles checkout before commit `9c5c568` (which deleted them).
 
 ## Architecture
 
