@@ -27,10 +27,8 @@ static FILENAME_RE: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 static FILENAME_NO_YEAR_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(
-        r"^(?P<show>.+?) - [sS](?P<season>\d{1,2})[eE](?P<ep>\d{1,2})(?:-e(?P<ep2>\d{1,2}))?(?: - (?P<title>.+))?$",
-    )
-    .unwrap()
+    Regex::new(r"^(?P<show>.+?) - [sS](?P<season>\d{1,2})[eE](?P<ep>\d{1,2})(?:-e(?P<ep2>\d{1,2}))?(?: - (?P<title>.+))?$")
+        .unwrap()
 });
 
 pub struct Args {
@@ -89,11 +87,7 @@ fn resolve_show(client: &mut dyn Client, title: &str, year: i32, threshold: f64)
     let mut scored: Vec<(f64, f64, Show)> = Vec::new();
     for show in results {
         let sim = title_sim(title, show.name.as_deref().unwrap_or(""));
-        let sy: Option<i32> = show
-            .premiered
-            .as_ref()
-            .and_then(|p| p.get(0..4))
-            .and_then(|y| y.parse().ok());
+        let sy: Option<i32> = show.premiered.as_ref().and_then(|p| p.get(0..4)).and_then(|y| y.parse().ok());
         let year_ok = year == 0 || sy == Some(year);
         let score = sim + if year_ok { 0.25 } else { 0.0 };
         scored.push((score, sim, show));
@@ -185,20 +179,18 @@ pub fn run(args: &Args) -> anyhow::Result<i32> {
     run_with_client(args, &mut client)
 }
 
+/// Per-(show, year) TVMaze resolution cache: the matched show (if any) and
+/// its episode-title lookup, keyed by (season, episode).
+type ShowCache = HashMap<(String, i32), (Option<Show>, HashMap<(u32, u32), String>)>;
+
 pub fn run_with_client(args: &Args, client: &mut dyn Client) -> anyhow::Result<i32> {
-    let root = fs::canonicalize(&args.root)
-        .map_err(|_| anyhow::anyhow!("'{}' is not a directory", args.root.display()))?;
+    let root = fs::canonicalize(&args.root).map_err(|_| anyhow::anyhow!("'{}' is not a directory", args.root.display()))?;
     if !root.is_dir() {
         eprintln!("Error: '{}' is not a directory", root.display());
         return Ok(1);
     }
 
-    println!(
-        "root={}  mode={}  threshold={}",
-        root.display(),
-        if args.apply { "APPLY" } else { "DRY RUN" },
-        args.threshold
-    );
+    println!("root={}  mode={}  threshold={}", root.display(), if args.apply { "APPLY" } else { "DRY RUN" }, args.threshold);
     println!("{}", "-".repeat(70));
 
     // (show, year-or-0, edition-or-empty, needs_year) -> [(path, parsed)]
@@ -258,7 +250,7 @@ pub fn run_with_client(args: &Args, client: &mut dyn Client) -> anyhow::Result<i
     let mut no_episode = 0usize;
     let mut no_year = 0usize;
     let mut multi_skip = 0usize;
-    let mut seen_shows: HashMap<(String, i32), (Option<Show>, HashMap<(u32, u32), String>)> = HashMap::new();
+    let mut seen_shows: ShowCache = HashMap::new();
 
     for key in &job_order {
         let (show, year, _edition, needs_year) = key.clone();
@@ -429,15 +421,8 @@ mod tests {
 
     #[test]
     fn new_stem_uses_resolved_year_when_filename_has_none() {
-        let p = ParsedFile {
-            show: "Severance".into(),
-            year: None,
-            edition: String::new(),
-            season: 1,
-            ep: 1,
-            ep2: None,
-            title: None,
-        };
+        let p =
+            ParsedFile { show: "Severance".into(), year: None, edition: String::new(), season: 1, ep: 1, ep2: None, title: None };
         assert_eq!(new_stem(&p, "Good News About Hell", Some(2022)), "Severance (2022) - s01e01 - Good News About Hell");
     }
 
@@ -452,10 +437,7 @@ mod tests {
             ep2: None,
             title: None,
         };
-        assert_eq!(
-            new_stem(&p, "Hide and Seek: Part 1/2", None),
-            "Show (2020) - s01e02 - Hide and Seek Part 1-2"
-        );
+        assert_eq!(new_stem(&p, "Hide and Seek: Part 1/2", None), "Show (2020) - s01e02 - Hide and Seek Part 1-2");
     }
 
     #[test]

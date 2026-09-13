@@ -69,12 +69,7 @@ fn libc_exdev() -> i32 {
 /// path), and prints every problem during the dry run before anything moves.
 /// `dir_renames` (used only by `titles`) is applied via `fs::rename` after
 /// every file move completes.
-pub fn execute_moves(
-    moves: &[(PathBuf, PathBuf)],
-    root: &Path,
-    apply: bool,
-    dir_renames: &[(PathBuf, PathBuf)],
-) -> MoveResult {
+pub fn execute_moves(moves: &[(PathBuf, PathBuf)], root: &Path, apply: bool, dir_renames: &[(PathBuf, PathBuf)]) -> MoveResult {
     let mut problems: Vec<String> = Vec::new();
     let mut skipped = 0usize;
 
@@ -124,8 +119,7 @@ pub fn execute_moves(
         winners.push(items[0].clone());
     }
 
-    let sources: std::collections::HashSet<PathBuf> =
-        winners.iter().map(|(src, _)| absolute(src)).collect();
+    let sources: std::collections::HashSet<PathBuf> = winners.iter().map(|(src, _)| absolute(src)).collect();
 
     let mut queue: Vec<(PathBuf, PathBuf, bool)> = Vec::new();
     for (src, dst) in winners {
@@ -159,8 +153,7 @@ pub fn execute_moves(
     let mut errors = 0usize;
     let mut remaining = queue;
     while !remaining.is_empty() {
-        let (ready, blocked): (Vec<_>, Vec<_>) =
-            remaining.into_iter().partition(|(_, dst, in_place)| *in_place || !dst.exists());
+        let (ready, blocked): (Vec<_>, Vec<_>) = remaining.into_iter().partition(|(_, dst, in_place)| *in_place || !dst.exists());
         if ready.is_empty() {
             for (_src, dst, _) in &blocked {
                 eprintln!("  !! blocked, target still occupied: {}", rel(root, dst).display());
@@ -209,11 +202,7 @@ pub fn execute_moves(
 }
 
 fn absolute(path: &Path) -> PathBuf {
-    if path.is_absolute() {
-        path.to_path_buf()
-    } else {
-        std::env::current_dir().unwrap_or_default().join(path)
-    }
+    if path.is_absolute() { path.to_path_buf() } else { std::env::current_dir().unwrap_or_default().join(path) }
 }
 
 /// Remove any directory under `candidates` (and their descendants) left empty

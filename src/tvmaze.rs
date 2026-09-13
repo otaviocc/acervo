@@ -62,19 +62,12 @@ impl HttpClient {
     fn get(&mut self, url: &str) -> Option<serde_json::Value> {
         for attempt in 0..MAX_RETRIES {
             self.throttle();
-            let result = ureq::get(url)
-                .set("User-Agent", USER_AGENT)
-                .timeout(self.timeout)
-                .call();
+            let result = ureq::get(url).set("User-Agent", USER_AGENT).timeout(self.timeout).call();
             match result {
                 Ok(resp) => return resp.into_json().ok(),
                 Err(ureq::Error::Status(429, resp)) => {
                     if attempt + 1 < MAX_RETRIES {
-                        let retry_after = resp
-                            .header("Retry-After")
-                            .and_then(|v| v.parse::<u64>().ok())
-                            .unwrap_or(10)
-                            .min(30);
+                        let retry_after = resp.header("Retry-After").and_then(|v| v.parse::<u64>().ok()).unwrap_or(10).min(30);
                         thread::sleep(Duration::from_secs(retry_after));
                         continue;
                     }
@@ -99,9 +92,7 @@ impl Client for HttpClient {
     fn search_shows(&mut self, title: &str) -> Vec<Show> {
         let url = format!("{API}/search/shows?q={}", urlencoding::encode(title));
         let Some(value) = self.get(&url) else { return Vec::new() };
-        serde_json::from_value::<Vec<SearchResult>>(value)
-            .map(|v| v.into_iter().map(|r| r.show).collect())
-            .unwrap_or_default()
+        serde_json::from_value::<Vec<SearchResult>>(value).map(|v| v.into_iter().map(|r| r.show).collect()).unwrap_or_default()
     }
 
     fn episodes(&mut self, show_id: u64) -> Vec<(u32, u32, String)> {

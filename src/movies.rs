@@ -6,7 +6,7 @@
 
 use crate::fsops::{execute_moves, prune_empty_dirs};
 use crate::naming::{safe_component, smart_title};
-use crate::tokens::{ext_of, EDITION_PATTERNS, LANG_RE, NOISE_RE, PART_RE, QUALITY_RE, YEAR_RE};
+use crate::tokens::{EDITION_PATTERNS, LANG_RE, NOISE_RE, PART_RE, QUALITY_RE, YEAR_RE, ext_of};
 use regex::Regex;
 use std::collections::HashMap;
 use std::fs;
@@ -98,11 +98,7 @@ fn parse_identity(stem: &str) -> Option<Parsed> {
         return None;
     }
 
-    Some(Parsed {
-        title: smart_title(title),
-        year,
-        edition: if editions.is_empty() { None } else { Some(editions.join(" ")) },
-    })
+    Some(Parsed { title: smart_title(title), year, edition: if editions.is_empty() { None } else { Some(editions.join(" ")) } })
 }
 
 /// Detect a multi-disc/multi-part split marker (e.g. "CD1", "Part 2").
@@ -148,8 +144,7 @@ fn sub_lang_of(stem: &str) -> String {
 }
 
 pub fn run(args: &Args) -> anyhow::Result<i32> {
-    let root = fs::canonicalize(&args.root)
-        .map_err(|_| anyhow::anyhow!("'{}' is not a directory", args.root.display()))?;
+    let root = fs::canonicalize(&args.root).map_err(|_| anyhow::anyhow!("'{}' is not a directory", args.root.display()))?;
     if !root.is_dir() {
         eprintln!("Error: '{}' is not a directory", root.display());
         return Ok(1);
@@ -171,10 +166,7 @@ pub fn run(args: &Args) -> anyhow::Result<i32> {
     let mut warnings: Vec<String> = Vec::new();
     let mut old_dirs: Vec<PathBuf> = Vec::new();
 
-    let plan_file = |moves: &mut Vec<(PathBuf, PathBuf)>,
-                          src_path: &Path,
-                          ident: &Parsed,
-                          target_dir: &Path| {
+    let plan_file = |moves: &mut Vec<(PathBuf, PathBuf)>, src_path: &Path, ident: &Parsed, target_dir: &Path| {
         let fn_ = src_path.file_name().unwrap().to_string_lossy().to_string();
         let Some((kind, ext)) = media_kind(&fn_) else { return };
         let stem = crate::tokens::stem_of(&fn_).to_string();
@@ -183,11 +175,7 @@ pub fn run(args: &Args) -> anyhow::Result<i32> {
         let dst_name = match kind {
             Kind::Sub => {
                 let lang = if !sub_lang.is_empty() { sub_lang.clone() } else { sub_lang_of(&stem) };
-                if !lang.is_empty() {
-                    format!("{base}.{lang}{ext}")
-                } else {
-                    format!("{base}{ext}")
-                }
+                if !lang.is_empty() { format!("{base}.{lang}{ext}") } else { format!("{base}{ext}") }
             }
             Kind::Video => format!("{base}{ext}"),
         };
@@ -215,12 +203,7 @@ pub fn run(args: &Args) -> anyhow::Result<i32> {
             found.sort();
             let mut videos: Vec<&PathBuf> = found
                 .iter()
-                .filter(|p| {
-                    matches!(
-                        media_kind(&p.file_name().unwrap().to_string_lossy()),
-                        Some((Kind::Video, _))
-                    )
-                })
+                .filter(|p| matches!(media_kind(&p.file_name().unwrap().to_string_lossy()), Some((Kind::Video, _))))
                 .collect();
             videos.sort_by_key(|p| std::cmp::Reverse(p.file_name().unwrap().len()));
 
@@ -237,10 +220,7 @@ pub fn run(args: &Args) -> anyhow::Result<i32> {
                 ident = parse_identity(&entry_name);
             }
             let Some(ident) = ident else {
-                warnings.push(format!(
-                    "could not parse (folder left as-is): {}",
-                    full.file_name().unwrap().to_string_lossy()
-                ));
+                warnings.push(format!("could not parse (folder left as-is): {}", full.file_name().unwrap().to_string_lossy()));
                 continue;
             };
             if found.is_empty() {

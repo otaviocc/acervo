@@ -8,9 +8,8 @@ use regex::Regex;
 use std::sync::LazyLock;
 
 /// `Title (year)` or `Title (year) {edition-...}` — an already-organized name.
-pub static ALREADY_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^(?P<title>.+?) \((?P<year>\d{4})\)(?: \{edition-(?P<ed>[^}]+)\})?$").unwrap()
-});
+pub static ALREADY_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^(?P<title>.+?) \((?P<year>\d{4})\)(?: \{edition-(?P<ed>[^}]+)\})?$").unwrap());
 
 /// First token of the "release tail"; everything from here on is not part of the title.
 pub static QUALITY_RE: LazyLock<Regex> = LazyLock::new(|| {
@@ -29,15 +28,9 @@ pub static EDITION_PATTERNS: LazyLock<Vec<(Regex, Option<&'static str>)>> = Lazy
     vec![
         (Regex::new(r"(?i)director'?s[ .]?cut").unwrap(), Some("Director's Cut")),
         (Regex::new(r"(?i)\bfinal[ .]?cut\b").unwrap(), Some("Final Cut")),
-        (
-            Regex::new(r"(?i)\bextended(?:[ .]?(?:cut|edition))?\b").unwrap(),
-            Some("Extended"),
-        ),
+        (Regex::new(r"(?i)\bextended(?:[ .]?(?:cut|edition))?\b").unwrap(), Some("Extended")),
         (Regex::new(r"(?i)\bunrated\b").unwrap(), Some("Unrated")),
-        (
-            Regex::new(r"(?i)\btheatrical(?:[ .]?cut)?\b").unwrap(),
-            Some("Theatrical"),
-        ),
+        (Regex::new(r"(?i)\btheatrical(?:[ .]?cut)?\b").unwrap(), Some("Theatrical")),
         (Regex::new(r"(?i)\bimax\b").unwrap(), Some("IMAX")),
         (Regex::new(r"(?i)\bremastered\b").unwrap(), None),
         (Regex::new(r"(?i)\brestored\b").unwrap(), None),
@@ -63,20 +56,16 @@ pub const LANG_CODES: &str = concat!(
 );
 
 /// A trailing language code on a subtitle stem, e.g. `...s01e01.en`.
-pub static LANG_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(&format!(r"(?i)[ ._-]({LANG_CODES})$")).unwrap());
+pub static LANG_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(&format!(r"(?i)[ ._-]({LANG_CODES})$")).unwrap());
 
 /// Same, but requiring a leading dot — used by `add-episode-titles`, which
 /// only strips a code that sits right after the extension-stripped stem.
-pub static SUB_LANG_DOT_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(&format!(r"(?i)\.(?:{LANG_CODES})$")).unwrap());
+pub static SUB_LANG_DOT_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(&format!(r"(?i)\.(?:{LANG_CODES})$")).unwrap());
 
-pub static PART_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(?i)\b(?:cd|dvd|disc|disk|part|pt)\s*0*([1-8])\b").unwrap());
+pub static PART_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)\b(?:cd|dvd|disc|disk|part|pt)\s*0*([1-8])\b").unwrap());
 
-pub static SPLIT_MARKER_TRAILING_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)\s*-\s*(?:cd|dvd|disc|disk|part|pt)\s*0*[1-8]\s*$").unwrap()
-});
+pub static SPLIT_MARKER_TRAILING_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)\s*-\s*(?:cd|dvd|disc|disk|part|pt)\s*0*[1-8]\s*$").unwrap());
 
 /// Lowercased extension, including the leading dot (`os.path.splitext`
 /// equivalent for the ASCII-only extensions this crate cares about).

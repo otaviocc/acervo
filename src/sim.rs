@@ -24,6 +24,9 @@ fn find_longest_match(
     let mut bestsize = 0usize;
     let mut j2len: HashMap<usize, usize> = HashMap::new();
 
+    // `i` mirrors Python's `for i in range(alo, ahi)` and feeds into `besti`
+    // below, so an iterator/enumerate rewrite would obscure the 1:1 port.
+    #[allow(clippy::needless_range_loop)]
     for i in alo..ahi {
         let mut newj2len: HashMap<usize, usize> = HashMap::new();
         if let Some(js) = b2j.get(&a[i]) {

@@ -6,7 +6,7 @@
 
 use crate::fsops::{execute_moves, prune_empty_dirs};
 use crate::naming::{safe_component, smart_title};
-use crate::tokens::{ext_of, EDITION_PATTERNS, LANG_RE, NOISE_RE, QUALITY_RE, YEAR_RE};
+use crate::tokens::{EDITION_PATTERNS, LANG_RE, NOISE_RE, QUALITY_RE, YEAR_RE, ext_of};
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -16,16 +16,12 @@ use std::sync::LazyLock;
 static DOT_UNDERSCORE_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[._]+").unwrap());
 static WHITESPACE_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\s+").unwrap());
 static SE_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[Ss](\d{1,2})[Ee](\d{1,2})").unwrap());
-static MULTI_EP_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"[\s._-]*-?\s*[eE](\d{1,2})\b").unwrap());
-static MULTI_PAREN_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\((\d+)\)[\s._]*and[\s._]*\((\d+)\)").unwrap());
+static MULTI_EP_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[\s._-]*-?\s*[eE](\d{1,2})\b").unwrap());
+static MULTI_PAREN_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\((\d+)\)[\s._]*and[\s._]*\((\d+)\)").unwrap());
 static BARE_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?:^|[\s._-])(\d{1,2})\s*$").unwrap());
 static SEASON_DIR_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[Ss]eason\s*(\d{1,2})").unwrap());
-static SEASON_TOKEN_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\b[Ss]\d{1,2}(?:[Ee]\d{1,2})?\b").unwrap());
-static SEASON_TRAIL_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(?i)\b[Ss]eason\s*\d{1,2}\b.*$").unwrap());
+static SEASON_TOKEN_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\b[Ss]\d{1,2}(?:[Ee]\d{1,2})?\b").unwrap());
+static SEASON_TRAIL_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)\b[Ss]eason\s*\d{1,2}\b.*$").unwrap());
 static RES_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)^\d{3,4}p$").unwrap());
 static TRAILING_BRACKET_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\s*\[[^\]]*$").unwrap());
 
@@ -53,6 +49,15 @@ enum Kind {
     Video,
     Sub,
 }
+
+/// A file with no episode number yet, awaiting the specials pass: (path, filename, kind, ext).
+type SpecialItem = (PathBuf, String, Kind, String);
+/// A file already grouped by stem for the specials pass: (path, kind, ext).
+type SpecialGroup = (PathBuf, Kind, String);
+/// A parsed episode file: (path, title, season, episode, second episode, kind, ext).
+type EpisodeItem = (PathBuf, String, u32, u32, Option<u32>, Kind, String);
+/// An episode number: (season, episode, second episode for multi-episode files).
+type EpNum = (u32, u32, Option<u32>);
 
 fn media_kind(filename: &str) -> Option<(Kind, String)> {
     let ext = ext_of(filename);
@@ -110,11 +115,7 @@ fn parse_show_identity(name: &str) -> Option<Identity> {
         return None;
     }
 
-    Some(Identity {
-        title: smart_title(title),
-        year,
-        edition: if editions.is_empty() { None } else { Some(editions.join(" ")) },
-    })
+    Some(Identity { title: smart_title(title), year, edition: if editions.is_empty() { None } else { Some(editions.join(" ")) } })
 }
 
 /// Derive a show title from a release name that carries no year.
@@ -139,11 +140,7 @@ fn fallback_show_title(name: &str) -> Option<String> {
     let norm = NOISE_RE.replace_all(&norm, " ").to_string();
     let norm = WHITESPACE_RE.replace_all(&norm, " ");
     let norm = norm.trim_matches(|c: char| " -._([".contains(c));
-    if norm.is_empty() {
-        None
-    } else {
-        Some(smart_title(norm))
-    }
+    if norm.is_empty() { None } else { Some(smart_title(norm)) }
 }
 
 /// `(season, episode, episode2, title)`. `season` is `None` when the number
@@ -192,7 +189,7 @@ fn season_from_folder(path: &Path) -> Option<u32> {
 }
 
 fn clean_episode_title(text: &str) -> String {
-    let s = text.replace('_', " ").replace('.', " ");
+    let s = text.replace(['_', '.'], " ");
     let s = WHITESPACE_RE.replace_all(&s, " ").trim().to_string();
     if s.is_empty() {
         return String::new();
@@ -259,7 +256,8 @@ struct Ctx<'a> {
 }
 
 impl<'a> Ctx<'a> {
-    fn plan_episode(&mut self, src_path: &Path, ident: &Identity, title: &str, ss: u32, ee: u32, ee2: Option<u32>, kind: Kind, ext: &str) {
+    fn plan_episode(&mut self, src_path: &Path, ident: &Identity, title: &str, ep: EpNum, kind: Kind, ext: &str) {
+        let (ss, ee, ee2) = ep;
         let base = file_base(ident, true, ss, ee, ee2, if self.minimal { "" } else { title }, self.minimal);
         let fname = if kind == Kind::Sub && !self.sub_lang.is_empty() {
             format!("{base}.{}{ext}", self.sub_lang)
@@ -285,15 +283,8 @@ fn canonicalize(canonical: &mut HashMap<String, String>, ident: &mut Identity) {
 /// Videos and their subtitles are grouped by stem so a pair keeps one number,
 /// and the original name becomes the episode title so the files stay
 /// identifiable.
-fn plan_specials(
-    ctx: &mut Ctx,
-    warnings: &mut Vec<String>,
-    items: &[(PathBuf, String, Kind, String)],
-    ident: &Identity,
-    label: &str,
-    bare: bool,
-) {
-    let mut groups: Vec<(String, Vec<(PathBuf, Kind, String)>)> = Vec::new();
+fn plan_specials(ctx: &mut Ctx, warnings: &mut Vec<String>, items: &[SpecialItem], ident: &Identity, label: &str, bare: bool) {
+    let mut groups: Vec<(String, Vec<SpecialGroup>)> = Vec::new();
     for (fpath, fn_, kind, ext) in items {
         let stem = crate::tokens::stem_of(fn_).to_string();
         let key = if *kind == Kind::Sub { sub_stem(&stem) } else { stem };
@@ -309,27 +300,20 @@ fn plan_specials(
             if cleaned.is_empty() { key.clone() } else { cleaned }
         };
         for (fpath, kind, ext) in files {
-            ctx.plan_episode(fpath, ident, &title, 0, (index + 1) as u32, None, *kind, ext);
+            ctx.plan_episode(fpath, ident, &title, (0, (index + 1) as u32, None), *kind, ext);
         }
     }
     if !groups.is_empty() {
-        let mut msg = format!(
-            "{} item(s) in '{}' had no episode number — filed as Season 00 specials",
-            groups.len(),
-            label
-        );
+        let mut msg = format!("{} item(s) in '{}' had no episode number — filed as Season 00 specials", groups.len(), label);
         if !bare {
-            msg.push_str(
-                "  [if they are episodes named 'Name 1..N', add --bare-number-episodes]",
-            );
+            msg.push_str("  [if they are episodes named 'Name 1..N', add --bare-number-episodes]");
         }
         warnings.push(msg);
     }
 }
 
 pub fn run(args: &Args) -> anyhow::Result<i32> {
-    let root = fs::canonicalize(&args.root)
-        .map_err(|_| anyhow::anyhow!("'{}' is not a directory", args.root.display()))?;
+    let root = fs::canonicalize(&args.root).map_err(|_| anyhow::anyhow!("'{}' is not a directory", args.root.display()))?;
     if !root.is_dir() {
         eprintln!("Error: '{}' is not a directory", root.display());
         return Ok(1);
@@ -424,8 +408,8 @@ pub fn run(args: &Args) -> anyhow::Result<i32> {
         canonicalize(&mut canonical, &mut ident);
         old_dirs.push(full.clone());
 
-        let mut episodes: Vec<(PathBuf, String, u32, u32, Option<u32>, Kind, String)> = Vec::new();
-        let mut unmatched: Vec<(PathBuf, String, Kind, String)> = Vec::new();
+        let mut episodes: Vec<EpisodeItem> = Vec::new();
+        let mut unmatched: Vec<SpecialItem> = Vec::new();
 
         let mut files: Vec<PathBuf> = walkdir::WalkDir::new(full)
             .into_iter()
@@ -464,15 +448,16 @@ pub fn run(args: &Args) -> anyhow::Result<i32> {
         }
 
         for (path, title, ss, ee, ee2, kind, ext) in &episodes {
-            let title = if ee2.is_none() { ep_best.get(&(*ss, *ee)).cloned().unwrap_or_else(|| title.clone()) } else { title.clone() };
-            ctx.plan_episode(path, &ident, &title, *ss, *ee, *ee2, *kind, ext);
+            let title =
+                if ee2.is_none() { ep_best.get(&(*ss, *ee)).cloned().unwrap_or_else(|| title.clone()) } else { title.clone() };
+            ctx.plan_episode(path, &ident, &title, (*ss, *ee, *ee2), *kind, ext);
         }
 
         plan_specials(&mut ctx, &mut warnings, &unmatched, &ident, &entry_name, bare);
     }
 
     // Loose root-level files, grouped for the specials pass by show folder name.
-    let mut loose_specials: Vec<(String, Identity, Vec<(PathBuf, String, Kind, String)>)> = Vec::new();
+    let mut loose_specials: Vec<(String, Identity, Vec<SpecialItem>)> = Vec::new();
     for fn_ in &loose {
         let (kind, ext) = media_kind(fn_).unwrap();
         let raw_stem = crate::tokens::stem_of(fn_).to_string();
@@ -510,7 +495,7 @@ pub fn run(args: &Args) -> anyhow::Result<i32> {
             continue;
         };
         let ss = ss.unwrap_or(1);
-        ctx.plan_episode(&root.join(fn_), &ident, &title, ss, ee, ee2, kind, &ext);
+        ctx.plan_episode(&root.join(fn_), &ident, &title, (ss, ee, ee2), kind, &ext);
     }
 
     loose_specials.sort_by(|a, b| a.0.cmp(&b.0));

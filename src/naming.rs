@@ -11,14 +11,11 @@ use std::sync::LazyLock;
 /// filesystem a media library is typically served from (APFS, ext4, SMB/NTFS).
 static UNSAFE_DASH_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[/\\|]").unwrap());
 /// Characters dropped outright: reserved or control characters.
-static UNSAFE_DROP_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r#"[:?"*<>\x00-\x1f]"#).unwrap());
+static UNSAFE_DROP_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"[:?"*<>\x00-\x1f]"#).unwrap());
 static WHITESPACE_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\s+").unwrap());
 
-pub static SMALL_WORDS: &[&str] = &[
-    "a", "an", "the", "of", "and", "or", "in", "on", "to", "for", "vs", "at", "by", "with",
-    "from", "as", "but", "nor",
-];
+pub static SMALL_WORDS: &[&str] =
+    &["a", "an", "the", "of", "and", "or", "in", "on", "to", "for", "vs", "at", "by", "with", "from", "as", "but", "nor"];
 
 /// Make a string safe to use as a single path component.
 ///
@@ -29,11 +26,7 @@ pub fn safe_component(name: &str) -> String {
     let name = UNSAFE_DROP_RE.replace_all(&name, "");
     let name = WHITESPACE_RE.replace_all(&name, " ");
     let trimmed = name.trim_matches(|c: char| c == ' ' || c == '.');
-    if trimmed.is_empty() {
-        "_".to_string()
-    } else {
-        trimmed.to_string()
-    }
+    if trimmed.is_empty() { "_".to_string() } else { trimmed.to_string() }
 }
 
 /// A fully shouty release name ("THE.DARK.KNIGHT") has no way to distinguish
