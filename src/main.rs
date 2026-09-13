@@ -21,8 +21,8 @@ fn main() {
         Command::Movies { root, apply, no_editions, sub_lang } => {
             movies::run(&movies::Args { root, apply, no_editions, sub_lang })
         }
-        Command::Titles { root, apply, multi_ep_first, threshold, timeout } => {
-            titles::run(&titles::Args { root, apply, multi_ep_first, threshold, timeout })
+        Command::Titles { root, apply, multi_ep_first, threshold, interactive, timeout } => {
+            titles::run(&titles::Args { root, apply, multi_ep_first, threshold, interactive, timeout })
         }
     };
     match code {

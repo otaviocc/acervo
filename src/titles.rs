@@ -7,12 +7,15 @@ use crate::sim::ratio;
 use crate::tokens::SUB_LANG_DOT_RE;
 use crate::tvmaze::{Client, HttpClient, Show};
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
+use std::io::{BufRead, IsTerminal, Write};
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
 const VIDEO_EXTS: &[&str] = &[".mkv", ".mp4", ".m4v", ".avi", ".mov", ".ts"];
+const PIN_FILE: &str = ".acervo-titles.json";
 const SUB_EXTS: &[&str] = &[".srt", ".ass", ".ssa", ".sub", ".vtt"];
 
 static FILENAME_RE: LazyLock<Regex> = LazyLock::new(|| {
@@ -32,6 +35,7 @@ pub struct Args {
     pub apply: bool,
     pub multi_ep_first: bool,
     pub threshold: f64,
+    pub interactive: bool,
     pub timeout: u64,
 }
 
@@ -69,9 +73,16 @@ fn title_sim(a: &str, b: &str) -> f64 {
     ratio(&normalize(a), &normalize(b))
 }
 
+struct Candidate {
+    name: String,
+    year: String,
+    sim: f64,
+    show: Show,
+}
+
 struct ResolveResult {
     show: Option<Show>,
-    candidates: Vec<(String, String, f64)>,
+    candidates: Vec<Candidate>,
 }
 
 fn resolve_show(client: &mut dyn Client, title: &str, year: i32, threshold: f64) -> ResolveResult {
@@ -91,10 +102,11 @@ fn resolve_show(client: &mut dyn Client, title: &str, year: i32, threshold: f64)
     let candidates = scored
         .iter()
         .take(3)
-        .map(|(_, sim, show)| {
-            let name = show.name.clone().unwrap_or_else(|| "?".to_string());
-            let year = show.premiered.as_ref().and_then(|p| p.get(0..4)).unwrap_or("None").to_string();
-            (name, year, *sim)
+        .map(|(_, sim, show)| Candidate {
+            name: show.name.clone().unwrap_or_else(|| "?".to_string()),
+            year: show.premiered.as_ref().and_then(|p| p.get(0..4)).unwrap_or("None").to_string(),
+            sim: *sim,
+            show: show.clone(),
         })
         .collect();
     let best = &scored[0];
@@ -107,6 +119,96 @@ fn resolve_show(client: &mut dyn Client, title: &str, year: i32, threshold: f64)
 
 fn fetch_episodes(client: &mut dyn Client, show: &Show) -> HashMap<(u32, u32), String> {
     client.episodes(show.id).into_iter().map(|(s, n, name)| ((s, n), name)).collect()
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+struct Pin {
+    show: String,
+    year: i32,
+    tvmaze_id: u64,
+}
+
+type PinMap = HashMap<(String, i32), u64>;
+
+type PinLabels = HashMap<(String, i32), String>;
+
+fn load_pins(path: &Path) -> (PinMap, PinLabels) {
+    let Ok(text) = fs::read_to_string(path) else { return (HashMap::new(), HashMap::new()) };
+    let pins: Vec<Pin> = serde_json::from_str(&text).unwrap_or_else(|e| {
+        eprintln!("  !! ignoring unreadable {}: {e}", path.display());
+        Vec::new()
+    });
+    let mut ids = HashMap::new();
+    let mut labels = HashMap::new();
+    for pin in pins {
+        let key = (pin.show.to_lowercase(), pin.year);
+        ids.insert(key.clone(), pin.tvmaze_id);
+        labels.insert(key, pin.show);
+    }
+    (ids, labels)
+}
+
+fn save_pins(path: &Path, labels: &PinLabels, pins: &PinMap) -> anyhow::Result<()> {
+    let mut out: Vec<Pin> = pins
+        .iter()
+        .map(|((show, year), id)| Pin {
+            show: labels.get(&(show.clone(), *year)).cloned().unwrap_or_else(|| show.clone()),
+            year: *year,
+            tvmaze_id: *id,
+        })
+        .collect();
+    out.sort_by_key(|a| (a.show.to_lowercase(), a.year));
+    fs::write(path, format!("{}\n", serde_json::to_string_pretty(&out)?))?;
+    Ok(())
+}
+
+fn write_pins(path: &Path, labels: &PinLabels, pins: &PinMap) {
+    match save_pins(path, labels, pins) {
+        Ok(()) => println!("\nsaved your picks to {PIN_FILE} — later runs reuse them without asking"),
+        Err(e) => eprintln!("\n  !! could not write {}: {e}", path.display()),
+    }
+}
+
+enum Answer {
+    Pick(usize),
+    Id(u64),
+    Skip,
+    Quit,
+}
+
+static SHOW_ID_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(?:#|.*/shows/)(\d+)").unwrap());
+
+fn parse_answer(input: &str, candidates: usize) -> Option<Answer> {
+    let text = input.trim();
+    match text.to_lowercase().as_str() {
+        "" | "s" => return Some(Answer::Skip),
+        "q" => return Some(Answer::Quit),
+        _ => {}
+    }
+    if let Some(caps) = SHOW_ID_RE.captures(text) {
+        return caps.get(1).unwrap().as_str().parse().ok().map(Answer::Id);
+    }
+    match text.parse::<usize>() {
+        Ok(n) if n >= 1 && n <= candidates => Some(Answer::Pick(n - 1)),
+        _ => None,
+    }
+}
+
+fn ask(candidates: usize) -> Answer {
+    let picks = if candidates > 0 { format!("pick [1-{candidates}], ") } else { String::new() };
+    let mut line = String::new();
+    loop {
+        print!("     {picks}#<tvmaze-id> or URL, s=skip, q=quit: ");
+        let _ = std::io::stdout().flush();
+        line.clear();
+        if std::io::stdin().lock().read_line(&mut line).unwrap_or(0) == 0 {
+            return Answer::Quit;
+        }
+        if let Some(answer) = parse_answer(&line, candidates) {
+            return answer;
+        }
+        println!("     not a valid choice");
+    }
 }
 
 fn new_stem(p: &ParsedFile, name: &str, resolved_year: Option<i32>) -> String {
@@ -243,6 +345,10 @@ pub fn run_with_client(args: &Args, client: &mut dyn Client) -> anyhow::Result<i
     let mut no_year = 0usize;
     let mut multi_skip = 0usize;
     let mut seen_shows: ShowCache = HashMap::new();
+    let pin_path = root.join(PIN_FILE);
+    let (mut pins, mut pin_labels) = load_pins(&pin_path);
+    let mut pins_dirty = false;
+    let interactive = args.interactive && std::io::stdin().is_terminal();
 
     for key in &job_order {
         let (show, year, _edition, needs_year) = key.clone();
@@ -254,24 +360,75 @@ pub fn run_with_client(args: &Args, client: &mut dyn Client) -> anyhow::Result<i
             } else {
                 println!("\nresolving: {show} (no year)");
             }
-            let result = resolve_show(client, &show, year, args.threshold);
-            let (tv, eps) = match &result.show {
+            let mut chosen: Option<(Show, &str)> = None;
+            let mut candidates: Vec<Candidate> = Vec::new();
+            let mut undecided = false;
+
+            match pins.get(&cache_key).copied() {
+                Some(id) => match client.show_by_id(id) {
+                    Some(tv) => chosen = Some((tv, "pinned")),
+                    None => {
+                        println!("  ?? pinned TVMaze id {id} could not be fetched — {} file(s) skipped", items.len());
+                        undecided = true;
+                    }
+                },
                 None => {
-                    println!("  ?? no reliable TVMaze match — {} file(s) skipped", items.len());
-                    for (name, premiered, sim) in &result.candidates {
-                        println!("     closest: {name} ({premiered})  similarity {sim:.2}");
+                    let result = resolve_show(client, &show, year, args.threshold);
+                    match result.show {
+                        Some(tv) => chosen = Some((tv, "matched")),
+                        None => {
+                            println!("  ?? no reliable TVMaze match — {} file(s) skipped", items.len());
+                            for c in &result.candidates {
+                                println!("     closest: {} ({})  similarity {:.2}", c.name, c.year, c.sim);
+                            }
+                            candidates = result.candidates;
+                            undecided = true;
+                        }
                     }
-                    if !result.candidates.is_empty() {
-                        println!("     (lower --threshold below {} to accept one)", args.threshold);
-                    }
-                    (None, HashMap::new())
                 }
-                Some(tv) => {
-                    let eps = fetch_episodes(client, tv);
+            }
+
+            if undecided {
+                if !interactive {
+                    if args.interactive {
+                        println!("     (--interactive ignored: stdin is not a terminal)");
+                    } else if !candidates.is_empty() {
+                        println!("     (lower --threshold below {}, or re-run with --interactive)", args.threshold);
+                    }
+                } else {
+                    match ask(candidates.len()) {
+                        Answer::Pick(i) => chosen = Some((candidates[i].show.clone(), "chose")),
+                        Answer::Id(id) => match client.show_by_id(id) {
+                            Some(tv) => chosen = Some((tv, "chose")),
+                            None => println!("     no TVMaze show with id {id} — skipping"),
+                        },
+                        Answer::Skip => {}
+                        Answer::Quit => {
+                            if pins_dirty {
+                                write_pins(&pin_path, &pin_labels, &pins);
+                            }
+                            println!("\naborted at your request — no files were moved");
+                            return Ok(1);
+                        }
+                    }
+                    if let Some((tv, how)) = &chosen {
+                        if *how == "chose" {
+                            pins.insert(cache_key.clone(), tv.id);
+                            pin_labels.insert(cache_key.clone(), show.clone());
+                            pins_dirty = true;
+                        }
+                    }
+                }
+            }
+
+            let (tv, eps) = match chosen {
+                Some((tv, how)) => {
+                    let eps = fetch_episodes(client, &tv);
                     let tv_year = tv.premiered.as_ref().and_then(|p| p.get(0..4)).unwrap_or("no year").to_string();
-                    println!("  matched -> {} ({})  {} episode titles", tv.name.clone().unwrap_or_default(), tv_year, eps.len());
-                    (Some(tv.clone()), eps)
+                    println!("  {how} -> {} ({})  {} episode titles", tv.name.clone().unwrap_or_default(), tv_year, eps.len());
+                    (Some(tv), eps)
                 }
+                None => (None, HashMap::new()),
             };
             seen_shows.insert(cache_key.clone(), (tv, eps));
         }
@@ -338,6 +495,10 @@ pub fn run_with_client(args: &Args, client: &mut dyn Client) -> anyhow::Result<i
         }
     }
 
+    if pins_dirty {
+        write_pins(&pin_path, &pin_labels, &pins);
+    }
+
     println!("{}", "-".repeat(70));
     let result = execute_moves(&plans, &root, args.apply, &dir_renames);
     let skipped = result.skipped + multi_skip;
@@ -373,11 +534,16 @@ mod tests {
     struct FakeClient {
         shows: Vec<Show>,
         episodes: HashMap<u64, Vec<(u32, u32, String)>>,
+        searches: usize,
     }
 
     impl Client for FakeClient {
         fn search_shows(&mut self, _title: &str) -> Vec<Show> {
+            self.searches += 1;
             self.shows.clone()
+        }
+        fn show_by_id(&mut self, show_id: u64) -> Option<Show> {
+            self.shows.iter().find(|s| s.id == show_id).cloned()
         }
         fn episodes(&mut self, show_id: u64) -> Vec<(u32, u32, String)> {
             self.episodes.get(&show_id).cloned().unwrap_or_default()
@@ -393,6 +559,7 @@ mod tests {
         let mut client = FakeClient {
             shows: vec![show(1, "The Office", Some("2005-03-24")), show(2, "The Office", Some("2001-07-09"))],
             episodes: HashMap::new(),
+            searches: 0,
         };
         let result = resolve_show(&mut client, "The Office", 2005, 0.75);
         assert_eq!(result.show.unwrap().id, 1);
@@ -400,10 +567,104 @@ mod tests {
 
     #[test]
     fn resolve_show_reports_nothing_below_threshold() {
-        let mut client = FakeClient { shows: vec![show(1, "Completely Different", None)], episodes: HashMap::new() };
+        let mut client = FakeClient { shows: vec![show(1, "Completely Different", None)], episodes: HashMap::new(), searches: 0 };
         let result = resolve_show(&mut client, "Severance", 0, 0.75);
         assert!(result.show.is_none());
         assert_eq!(result.candidates.len(), 1);
+    }
+
+    #[test]
+    fn parse_answer_reads_picks_ids_and_controls() {
+        assert!(matches!(parse_answer("2", 3), Some(Answer::Pick(1))));
+        assert!(matches!(parse_answer(" 1 \n", 3), Some(Answer::Pick(0))));
+        assert!(matches!(parse_answer("#526", 3), Some(Answer::Id(526))));
+        assert!(matches!(parse_answer("https://www.tvmaze.com/shows/526/the-office", 3), Some(Answer::Id(526))));
+        assert!(matches!(parse_answer("", 3), Some(Answer::Skip)));
+        assert!(matches!(parse_answer("S", 3), Some(Answer::Skip)));
+        assert!(matches!(parse_answer("q", 3), Some(Answer::Quit)));
+        assert!(parse_answer("4", 3).is_none());
+        assert!(parse_answer("0", 3).is_none());
+        assert!(parse_answer("2", 0).is_none());
+        assert!(parse_answer("nonsense", 3).is_none());
+    }
+
+    #[test]
+    fn pins_round_trip_through_the_sidecar_file() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join(PIN_FILE);
+        let key = ("the office".to_string(), 2005);
+        let pins = PinMap::from([(key.clone(), 526)]);
+        let labels = HashMap::from([(key.clone(), "The Office".to_string())]);
+        save_pins(&path, &labels, &pins).unwrap();
+        assert!(fs::read_to_string(&path).unwrap().contains("\"The Office\""));
+
+        let (ids, labels) = load_pins(&path);
+        assert_eq!(ids.get(&key), Some(&526));
+        assert_eq!(labels.get(&key).map(String::as_str), Some("The Office"));
+
+        let other = ("severance".to_string(), 2022);
+        let mut ids = ids;
+        ids.insert(other.clone(), 44933);
+        save_pins(&path, &labels, &ids).unwrap();
+        let (_, labels) = load_pins(&path);
+        assert_eq!(labels.get(&key).map(String::as_str), Some("The Office"), "an untouched pin keeps its spelling");
+    }
+
+    #[test]
+    fn a_pinned_show_is_used_without_searching() {
+        let dir = tempdir().unwrap();
+        let root = dir.path();
+        let show_dir = root.join("Severance (2022)/Season 01");
+        fs::create_dir_all(&show_dir).unwrap();
+        fs::write(show_dir.join("Severance (2022) - s01e01.mkv"), b"x").unwrap();
+        fs::write(root.join(PIN_FILE), r#"[{"show": "Severance", "year": 2022, "tvmaze_id": 41007}]"#).unwrap();
+
+        let mut client = FakeClient {
+            shows: vec![show(41007, "Severance", Some("2022-02-18"))],
+            episodes: HashMap::from([(41007, vec![(1, 1, "Good News About Hell".to_string())])]),
+            searches: 0,
+        };
+
+        let args = Args {
+            root: root.to_path_buf(),
+            apply: true,
+            multi_ep_first: false,
+            threshold: 0.75,
+            interactive: false,
+            timeout: 15,
+        };
+        assert_eq!(run_with_client(&args, &mut client).unwrap(), 0);
+        assert_eq!(client.searches, 0, "a pinned show must not hit the search endpoint");
+        assert!(show_dir.join("Severance (2022) - s01e01 - Good News About Hell.mkv").exists());
+    }
+
+    #[test]
+    fn an_unfetchable_pin_skips_the_show_instead_of_searching() {
+        let dir = tempdir().unwrap();
+        let root = dir.path();
+        let show_dir = root.join("Severance (2022)/Season 01");
+        fs::create_dir_all(&show_dir).unwrap();
+        let video = show_dir.join("Severance (2022) - s01e01.mkv");
+        fs::write(&video, b"x").unwrap();
+        fs::write(root.join(PIN_FILE), r#"[{"show": "Severance", "year": 2022, "tvmaze_id": 999}]"#).unwrap();
+
+        let mut client = FakeClient {
+            shows: vec![show(1, "Severance", Some("2022-02-18"))],
+            episodes: HashMap::from([(1, vec![(1, 1, "Good News About Hell".to_string())])]),
+            searches: 0,
+        };
+
+        let args = Args {
+            root: root.to_path_buf(),
+            apply: true,
+            multi_ep_first: false,
+            threshold: 0.75,
+            interactive: false,
+            timeout: 15,
+        };
+        assert_eq!(run_with_client(&args, &mut client).unwrap(), 0);
+        assert_eq!(client.searches, 0, "a pin that cannot be fetched must not fall back to a search");
+        assert!(video.exists(), "the file must be left alone rather than titled from a guessed show");
     }
 
     #[test]
@@ -449,9 +710,17 @@ mod tests {
         let mut client = FakeClient {
             shows: vec![show(1, "Severance", Some("2022-02-18"))],
             episodes: HashMap::from([(1, vec![(1, 1, "Good News About Hell".to_string())])]),
+            searches: 0,
         };
 
-        let args = Args { root: root.to_path_buf(), apply: true, multi_ep_first: false, threshold: 0.75, timeout: 15 };
+        let args = Args {
+            root: root.to_path_buf(),
+            apply: true,
+            multi_ep_first: false,
+            threshold: 0.75,
+            interactive: false,
+            timeout: 15,
+        };
         let code = run_with_client(&args, &mut client).unwrap();
         assert_eq!(code, 0);
 

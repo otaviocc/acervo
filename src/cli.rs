@@ -49,6 +49,8 @@ pub enum Command {
         multi_ep_first: bool,
         #[arg(long, default_value_t = 0.75, help = "Minimum TVMaze title similarity to accept (default 0.75)")]
         threshold: f64,
+        #[arg(long, help = "Prompt to pick a TVMaze show when no match clears the threshold")]
+        interactive: bool,
         #[arg(long, default_value_t = 15, help = "HTTP timeout in seconds (default 15)")]
         timeout: u64,
     },

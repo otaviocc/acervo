@@ -31,6 +31,7 @@ struct Episode {
 
 pub trait Client {
     fn search_shows(&mut self, title: &str) -> Vec<Show>;
+    fn show_by_id(&mut self, show_id: u64) -> Option<Show>;
     fn episodes(&mut self, show_id: u64) -> Vec<(u32, u32, String)>;
 }
 
@@ -88,6 +89,11 @@ impl Client for HttpClient {
         let url = format!("{API}/search/shows?q={}", urlencoding::encode(title));
         let Some(value) = self.get(&url) else { return Vec::new() };
         serde_json::from_value::<Vec<SearchResult>>(value).map(|v| v.into_iter().map(|r| r.show).collect()).unwrap_or_default()
+    }
+
+    fn show_by_id(&mut self, show_id: u64) -> Option<Show> {
+        let url = format!("{API}/shows/{show_id}");
+        serde_json::from_value(self.get(&url)?).ok()
     }
 
     fn episodes(&mut self, show_id: u64) -> Vec<(u32, u32, String)> {
