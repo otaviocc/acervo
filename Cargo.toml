@@ -1,0 +1,31 @@
+[package]
+name = "acervo"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Organize movie and TV libraries into Jellyfin's naming convention, and backfill TV episode titles from TVMaze."
+license = "MIT"
+readme = "README.md"
+keywords = ["jellyfin", "media", "cli", "organize"]
+categories = ["command-line-utilities"]
+
+[[bin]]
+name = "acervo"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+regex = "1"
+walkdir = "2"
+ureq = { version = "2", features = ["json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+urlencoding = "2"
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
