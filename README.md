@@ -1,5 +1,11 @@
 # acervo
 
+[![CI](https://img.shields.io/github/actions/workflow/status/otaviocc/acervo/ci.yml?branch=main)](https://github.com/otaviocc/acervo/actions/workflows/ci.yml)
+[![GitHub release](https://img.shields.io/github/v/release/otaviocc/acervo)](https://github.com/otaviocc/acervo/releases/latest)
+[![crates.io](https://img.shields.io/crates/v/acervo.svg)](https://crates.io/crates/acervo)
+[![license](https://img.shields.io/crates/l/acervo.svg)](https://github.com/otaviocc/acervo/blob/main/LICENSE)
+[![homebrew](https://img.shields.io/badge/homebrew-acervo-blue.svg)](https://github.com/otaviocc/homebrew-apps)
+
 A single static binary that organizes movie and TV libraries into
 Jellyfin's naming convention for
 [movies](https://jellyfin.org/docs/general/server/media/movies/) and
