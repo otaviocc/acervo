@@ -26,7 +26,7 @@ planned moves without touching the filesystem.
 ## Install
 
 ```sh
-cargo install --git https://github.com/otaviocc/acervo
+cargo install acervo
 ```
 
 ## Usage

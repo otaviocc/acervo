@@ -120,9 +120,37 @@ jobs:
           path: dist/*.tar.gz
           if-no-files-found: error
 
+  publish:
+    name: publish to crates.io
+    # After the binaries build, so a build failure never leaves a published
+    # crate without a release to go with it.
+    needs: [verify, build]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Idempotent: re-running a tag's release after a partial failure must
+          # not fail because the crate is already there at this version.
+          log="$(mktemp)"
+          if cargo publish --locked 2>&1 | tee "$log"; then
+            exit 0
+          fi
+          if grep -q "already uploaded" "$log"; then
+            echo "acervo is already published at this version, skipping."
+            exit 0
+          fi
+          exit 1
+
   release:
     name: github release
-    needs: [verify, build]
+    needs: [verify, build, publish]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
@@ -146,7 +174,7 @@ jobs:
           ## Install
 
           \`\`\`sh
-          cargo install --git https://github.com/otaviocc/acervo --locked
+          cargo install acervo --locked
           \`\`\`
 
           Or take one of the archives below — each holds the binary, the README
