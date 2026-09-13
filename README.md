@@ -1,7 +1,9 @@
 # acervo
 
 A single static binary that organizes movie and TV libraries into
-[Jellyfin's naming convention](https://jellyfin.org/docs/general/server/media/movie-naming/)
+Jellyfin's naming convention for
+[movies](https://jellyfin.org/docs/general/server/media/movies/) and
+[shows](https://jellyfin.org/docs/general/server/media/shows/)
 and backfills TV episode titles from [TVMaze](https://www.tvmaze.com/api).
 
 ```
